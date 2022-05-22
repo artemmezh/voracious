@@ -128,3 +128,6 @@ You should change config.json in folder (~/Library/Application Support/Anki2) of
 ## Can`t start application cause ' file too short'
 This is described in this issue https://github.com/rsimmons/voracious/issues/43
 Please, opening the zip file with The Unarchiver
+
+## Subtitle does`t show 
+You should name subtitles exactly like video. For example, if video name is `funny-poopy.mp4` then subtitle name should be `funny-poopy.srt`
