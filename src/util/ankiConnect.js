@@ -20,7 +20,7 @@ export const ankiConnectInvoke = (action, version, params={}) => {
       }
     });
 
-    xhr.open('POST', 'http://127.0.0.1:8765');
+    xhr.open('POST', 'http://localhost:8765');
     xhr.send(JSON.stringify({action, version, params}));
   });
 };

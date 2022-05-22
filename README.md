@@ -110,3 +110,17 @@ and check it out.
 It's often useful to check exactly what files have been included in the archive distributed with the Electron app. An easy way to do that is to install the `asar` tool (`yarn global add asar`) and then (on mac) run:
 
 ```$ asar list dist/mac/Voracious.app/Contents/Resources/app.asar```
+
+
+## About ankiConnect
+You should change config.json in folder (~/Library/Application Support/Anki2) of anki ads. Change ` "webCorsOriginList": ["http://localhost"]` to ` "webCorsOriginList": ["*"]`
+```
+{
+    "apiKey": null,
+    "apiLogPath": null,
+    "webBindAddress": "127.0.0.1",
+    "webBindPort": 8765,
+    "webCorsOriginList": ["*"],
+    "ignoreOriginList": []
+}
+```
