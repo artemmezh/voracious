@@ -31,6 +31,7 @@ const MainStateRecord = new Record({
   modalLoadingMessage: null,
   collections: new IMap(), // locator -> CollectionRecord
   dictionaries: new IMap(), // name -> object that we don't mutate (TODO: make it a Record)
+  wordList: new IMap(), // word -> SavedWordRecord
   preferences: new PreferencesRecord(),
 });
 
@@ -46,6 +47,7 @@ const TitleRecord = new Record({
   series: undefined,
   videoId: undefined, // only defined if not a series
   parts: undefined, // only defined if a series
+  playbackPosition: undefined,
 });
 
 const VideoRecord = new Record({
@@ -53,7 +55,7 @@ const VideoRecord = new Record({
   name: undefined,
   videoURL: undefined,
   subtitleTracks: new IMap(), // id -> SubtitleTrackRecord
-  playbackPosition: 0,
+  playbackPosition: null,
   loadingSubs: false,
 });
 
@@ -61,6 +63,10 @@ const SubtitleTrackRecord = new Record({
   id: undefined,
   language: undefined,
   chunkSet: undefined,
+});
+
+const SavedWordRecord = new Record({
+  learnState: 0,
 });
 
 export default class MainActions {
@@ -80,6 +86,8 @@ export default class MainActions {
     this.storage = await createStorageBackend();
 
     await this._storageLoadProfile();
+
+    await this._storageLoadSavedWordList();
 
     if (!process.argv.includes('--nodicts')) {
       this._setLoadingMessage('Loading dictionaries...');
@@ -115,6 +123,7 @@ export default class MainActions {
         name: vid.name,
         videoURL: vid.url,
         subtitleTracks: new IMap(subTrackKVs),
+        playbackPosition: vid.playbackPosition,
         // remaining fields are OK to leave as default
       })]);
     }
@@ -126,6 +135,7 @@ export default class MainActions {
         series: title.series,
         videoId: title.videoId, // only defined if not a series
         parts: title.parts, // only defined if a series
+        playbackPosition: title.playbackPosition,
       }));
     }
 
@@ -199,6 +209,18 @@ export default class MainActions {
     }
 
     await this.storage.setItem('profile', jstr(profileObj));
+  };
+
+  _storageLoadSavedWordList = async () => {
+    const word_map = await this.storage.getAllWords();
+
+    for (const [word, data] of word_map) {
+      const jdata = jpar(data);
+      this.state.set(this.state.get().setIn(
+        ['wordList', word],
+        new SavedWordRecord().set('learnState', jdata.learnState)
+      ));
+    }
   };
 
   loadVideoPlaybackPosition = async (collectionLocator, videoId) => {
@@ -399,5 +421,40 @@ export default class MainActions {
     await fs.unlink(dict.filename);
 
     this.state.set(this.state.get().deleteIn(['dictionaries', name]));
+  };
+
+  // Searches the word list (different from the dictionaries) for an entry,
+  // and returns the data associated with it if it's found.  Otherwise
+  // returns null.
+  searchWordList = async (word) => {
+    const word_entry = await this.storage.getWordMaybe('profile');
+
+    if (word_entry) {
+      return jpar(word_entry);
+    } else {
+      return null;
+    }
+  };
+
+  // Sets the data for the given word in the word list.
+  setWordInList = async (word, data) => {
+    // Set the local state list
+    this.state.set(this.state.get().setIn(['wordList', word], data));
+
+    // Set the database store.
+    await this.storage.setWord(word, jstr(data));
+  };
+
+  // Gets the data for the given word in the word list.
+  //
+  // Note: this cannot fail, and will simply return a default SavedWordRecord
+  // if the word has not been recorded in the list yet.
+  getWordFromList = (word) => {
+    // Get's the word data from the local state list
+    if (this.state.get().get('wordList').has(word)) {
+      return this.state.get().get('wordList').get(word);
+    } else {
+      return new SavedWordRecord();
+    }
   };
 };

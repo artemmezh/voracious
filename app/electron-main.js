@@ -55,7 +55,13 @@ function addIpcHandlers() {
 
 function createWindow() {
   // Create the browser window.
-  mainWindow = new BrowserWindow({width: 1280, height: 720});
+  mainWindow = new BrowserWindow({
+    width: 1280,
+    height: 720,
+    webPreferences: {
+      nodeIntegration: true
+    }
+  });
 
   // and load the index.html of the app.
   const startUrl = process.env.ELECTRON_START_URL || url.format({
@@ -131,7 +137,7 @@ app.on('ready', () => {
   addIpcHandlers();
 
   const menu = Menu.buildFromTemplate(menuTemplate)
-  Menu.setApplicationMenu(menu); // for win/linux, but should be ignored on mac
+  Menu.setApplicationMenu(null); // for win/linux, but should be ignored on mac
 
   createWindow();
 });

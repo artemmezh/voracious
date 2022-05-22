@@ -1,5 +1,7 @@
 import React, { Component } from 'react';
 
+import { secondsToTimestamp } from '../util/string';
+
 import './Player.css';
 
 import Select from './Select.js';
@@ -9,6 +11,34 @@ import PlayerExportPanel from './PlayerExportPanel';
 import { getChunkAtTime, getPrevChunkAtTime, getNextChunkAtTime } from '../util/chunk';
 
 const { remote } = window.require('electron');
+
+class Timeline extends Component {
+  constructor(props) {
+    super(props);
+    this.elem = null;
+  }
+
+  handleFocus = (e) => {
+    // When the element gets focus, immediately remove it.
+    // This is a timeline, not normal input slider.  There are
+    // already hotkeys for moving on the timeline.
+    e.preventDefault();
+    if (e.currentTarget !== null) {
+      e.currentTarget.blur();
+    }
+    if (e.relatedTarget !== null) {
+      e.relatedTarget.focus();
+    }
+  }
+
+
+  render() {
+    const { videoDuration, currentTime, onSlide } = this.props;
+    return (
+      <input class="video_timeline" type="range" min="0" max={Math.ceil(videoDuration)} value={Math.round(currentTime)} onChange={onSlide} onFocus={this.handleFocus} ref={(el) => { this.elem = el; }} />
+    );
+  }
+}
 
 class VideoWrapper extends Component {
   constructor(props) {
@@ -37,7 +67,7 @@ class VideoWrapper extends Component {
     this.videoElem.pause();
   }
 
-  togglePause() {
+  togglePause = () => {
     if (this.videoElem) {
       if (this.videoElem.paused) {
         this.videoElem.play();
@@ -47,16 +77,52 @@ class VideoWrapper extends Component {
     }
   }
 
+  handleTimelineSlide = (e) => {
+    this.seek(e.target.value);
+  }
+
   handleCanPlay = (e) => {
-    if (e.target.webkitAudioDecodedByteCount === 0) {
-      this.props.onNoAudio();
-    }
+    // // TODO: this code below doesn't work anymore, and always detects no audio
+    // // even when the video does play audio just fine. Figure out how to get
+    // // this working again.
+    // if (e.target.webkitAudioDecodedByteCount === 0) {
+    //   this.props.onNoAudio();
+    // }
+  }
+
+  handlePlayButton = () => {
+    this.togglePause();
   }
 
   render() {
-    const { videoURL, initialTime, onTimeUpdate, onPlaying, onPause, onEnded, onSeeking } = this.props;
+    const { videoURL, initialTime, onTimeUpdate, onPlaying, onPause, onEnded, onSeeking, controlsHidden } = this.props;
+    var class_names = controlsHidden ? "controls-hide" : "";
+
+    // Get timeline info.
+    var video_current_time = 0.0;
+    var video_duration = 0.0;
+    if (this.videoElem && this.videoElem.currentTime > 0.0) {
+      video_current_time = this.videoElem.currentTime;
+    }
+    if (this.videoElem && this.videoElem.duration > 0.0) {
+      video_duration = this.videoElem.duration;
+    }
+
+    // Choose play/pause icon.
+    var play_icon = "⏸";
+    if (this.videoElem && this.videoElem.paused) {
+      play_icon = "▶";
+    }
+
     return (
-      <video src={videoURL} controls controlsList="nodownload nofullscreen" onTimeUpdate={e => { onTimeUpdate(e.target.currentTime); }} onPlaying={onPlaying} onPause={onPause} onEnded={onEnded} onSeeking={onSeeking} ref={(el) => { this.videoElem = el; }} onLoadedMetadata={e => { e.target.currentTime = initialTime ? initialTime : 0; }} onCanPlay={this.handleCanPlay} />
+      <div class="video_wrapper">
+        <video src={videoURL} onTimeUpdate={e => { onTimeUpdate(e.target.currentTime); }} onPlaying={onPlaying} onPause={onPause} onEnded={onEnded} onSeeking={onSeeking} ref={(el) => { this.videoElem = el; }} onLoadedMetadata={e => { e.target.currentTime = initialTime ? initialTime : 0; }} onCanPlay={this.handleCanPlay} onClick={this.togglePause}/>
+        <div className={"video_playback_controls " + class_names}>
+          <div class="play_button" onClick={this.handlePlayButton}>{play_icon}</div>
+          <span class="video_timestamp">{secondsToTimestamp(video_current_time)}&nbsp;&nbsp;/&nbsp;&nbsp;{secondsToTimestamp(video_duration)}</span>
+          <Timeline videoDuration={video_duration} currentTime={video_current_time} onSlide={this.handleTimelineSlide} />
+        </div>
+      </div>
     );
   }
 }
@@ -64,11 +130,13 @@ class VideoWrapper extends Component {
 class PlayControls extends Component {
   componentDidMount() {
     document.body.addEventListener('keydown', this.handleKeyDown);
-  }
+    document.body.addEventListener('keyup', this.handleKeyUp);
+  };
 
   componentWillUnmount() {
     document.body.removeEventListener('keydown', this.handleKeyDown);
-  }
+    document.body.removeEventListener('keyup', this.handleKeyUp);
+  };
 
   handleKeyDown = (e) => {
     // Only process event if the target is the body,
@@ -78,7 +146,7 @@ class PlayControls extends Component {
       return;
     }
 
-    const { onBack, onAhead, onReplay, onTogglePause, onContinue, onToggleRuby, onToggleHelp, onNumberKey, onExportCard, onToggleFullscreen } = this.props;
+    const { onBack, onAhead, onReplay, onTogglePause, onContinue, onToggleRuby, onMainSubTransient, onRubyTransient, onToggleHelp, onNumberKey, onExportCard, onToggleFullscreen } = this.props;
 
     if (!e.repeat) {
       if ((e.keyCode >= 49) && (e.keyCode <= 57)) {
@@ -97,17 +165,17 @@ class PlayControls extends Component {
             break;
 
           case 38: // up arrow
+            onContinue();
+            e.preventDefault();
+            break;
+
+          case 40: // down arrow
             onReplay();
             e.preventDefault();
             break;
 
           case 32: // space
             onTogglePause();
-            e.preventDefault();
-            break;
-
-          case 40: // down arrow
-            onContinue();
             e.preventDefault();
             break;
 
@@ -123,8 +191,17 @@ class PlayControls extends Component {
             break;
 
           case 82: // R key
+          case 192: // Backtick key
             onToggleRuby();
             e.preventDefault();
+            break;
+
+          case 191: // Forward slash
+            onMainSubTransient(true);
+            break;
+
+          case 16: // Shift
+            onRubyTransient(true);
             break;
 
           case 72: // H key
@@ -136,6 +213,33 @@ class PlayControls extends Component {
             // ignore
             break;
         }
+      }
+    }
+  }
+
+  handleKeyUp = (e) => {
+    // Only process event if the target is the body,
+    // to avoid messing with typing into input elements, etc.
+    // Should we do this instead? e.target.tagName.toUpperCase() === 'INPUT'
+    if (e.target !== document.body) {
+      return;
+    }
+
+    const { onMainSubTransient, onRubyTransient } = this.props;
+
+    if (!e.repeat) {
+      switch (e.keyCode) {
+        case 191: // Forward slash
+          onMainSubTransient(false);
+          break;
+
+        case 16: // Shift
+          onRubyTransient(false);
+          break;
+
+        default:
+          // ignore
+          break;
       }
     }
   }
@@ -178,7 +282,10 @@ export default class Player extends Component {
       subtitleState,
       displayedSubTime,
       displayedSubs: this.getSubsToDisplay(displayedSubTime, subtitleMode, subtitleState),
+      transientSubsOn: false,
+      transientRubyOn: false,
       noAudio: false,
+      controlsHidden: false,
       exporting: null,
     };
 
@@ -190,7 +297,8 @@ export default class Player extends Component {
   componentDidMount() {
     this.props.onNeedSubtitles();
     this.restorePlaybackPosition();
-
+    document.body.addEventListener('mousemove', this.handleMouseMove);
+    this.handleMouseMove();
     this.savePlaybackPositionTimer = window.setInterval(this.savePlaybackPosition, 1000);
   }
 
@@ -198,6 +306,7 @@ export default class Player extends Component {
     if (this.savePlaybackPositionTimer) {
       window.clearInterval(this.savePlaybackPositionTimer);
     }
+    document.body.removeEventListener('mousemove', this.handleMouseMove);
   }
 
   componentDidUpdate(prevProps) {
@@ -211,6 +320,17 @@ export default class Player extends Component {
       this.restorePlaybackPosition();
     }
   }
+
+  handleMouseMove = () => {
+    this.setState({ controlsHidden: false });
+    window.clearTimeout(this.hideUITimer);
+    this.hideUITimer = window.setTimeout(this.handleMouseMoveTimeout, 2000);
+  };
+
+  handleMouseMoveTimeout = () => {
+    this.setState({ controlsHidden: true });
+    window.clearTimeout(this.hideUITimer);
+  };
 
   getOrderedSubtitleTracks = () => {
     return this.props.sortFilterSubtitleTracksMap(this.props.video.subtitleTracks);
@@ -365,6 +485,8 @@ export default class Player extends Component {
       };
     });
     this.props.onSetPreference('subtitleMode', newMode);
+
+
   };
 
   handleBack = () => {
@@ -430,7 +552,8 @@ export default class Player extends Component {
   handleContinue = () => {
     switch (this.state.subtitleMode) {
       case 'manual':
-        this.videoMediaComponent.play();
+        this.handleNumberKey(1);
+        // this.videoMediaComponent.play();
         break;
 
       case 'qcheck': // fall through
@@ -441,8 +564,12 @@ export default class Player extends Component {
         if (currentRevelation > maxRevelation) {
           throw new Error('internal error');
         } else if (currentRevelation === maxRevelation) {
-          // Continue playing video
-          this.videoMediaComponent.play();
+          if (this.state.subtitleMode === 'qcheck') {
+            this.videoMediaComponent.togglePause();
+          } else {
+            // Continue playing video
+            this.videoMediaComponent.play();
+          }
           this.unfreezeSubs();
         } else {
           // Reveal one more subtitle track
@@ -456,7 +583,7 @@ export default class Player extends Component {
           });
 
           if (this.state.subtitleMode === 'qcheck') {
-            this.videoMediaComponent.pause();
+            this.videoMediaComponent.togglePause();
           }
         }
         break;
@@ -475,6 +602,45 @@ export default class Player extends Component {
   handleToggleRuby = () => {
     const { preferences, onSetPreference } = this.props;
     onSetPreference('showRuby', !preferences.showRuby);
+  };
+
+  handleRubyTransient = (set_on) => {
+    const { preferences, onSetPreference } = this.props;
+    if (set_on) {
+      if (!preferences.showRuby) {
+        this.setState({transientRubyOn: true});
+        onSetPreference('showRuby', true);
+      }
+    } else {
+      if (this.state.transientRubyOn) {
+        this.setState({transientRubyOn: false});
+        onSetPreference('showRuby', false);
+      }
+    }
+  };
+
+  handleMainSubTransient = (set_on) => {
+    if (this.state.subtitleMode === 'manual') {
+      if (set_on) {
+        if ([...this.state.subtitleState.trackHidden][0]) {
+          const newTrackHidden = [...this.state.subtitleState.trackHidden];
+          newTrackHidden[0] = false;
+          this.setState({
+            subtitleState: {trackHidden: newTrackHidden},
+            transientSubsOn: true
+          });
+        }
+      } else {
+        if (this.state.transientSubsOn) {
+          const newTrackHidden = [...this.state.subtitleState.trackHidden];
+          newTrackHidden[0] = true;
+          this.setState({
+            subtitleState: {trackHidden: newTrackHidden},
+            transientSubsOn: false
+          });
+        }
+      }
+    }
   };
 
   handleToggleHelp = () => {
@@ -508,6 +674,7 @@ export default class Player extends Component {
           chunk: currentChunk,
           videoTime: this.videoTime,
           selectedText: this.firstAnnoTextComponent ? this.firstAnnoTextComponent.getSelectedText() : null,
+          title: this.props.video.name,
         };
       }
       return newState;
@@ -539,11 +706,15 @@ export default class Player extends Component {
   render() {
     const { video } = this.props;
 
+    var playerStyle = this.state.controlsHidden ? {
+      cursor: 'none',
+    } : {};
+
     return (
-      <div className="Player">
+      <div className="Player" style={playerStyle}>
         <div className="Player-main">
           <div className="Player-video-area">
-            <VideoWrapper videoURL={video.videoURL} initialTime={video.playbackPosition} onTimeUpdate={this.handleVideoTimeUpdate} onPlaying={this.handleVideoPlaying} onPause={this.handleVideoPause} onEnded={this.handleVideoEnded} onSeeking={this.handleVideoSeeking} onNoAudio={this.handleNoAudio} ref={(c) => { this.videoMediaComponent = c; }} />
+            <VideoWrapper videoURL={video.videoURL} initialTime={video.playbackPosition} onTimeUpdate={this.handleVideoTimeUpdate} onPlaying={this.handleVideoPlaying} onPause={this.handleVideoPause} onEnded={this.handleVideoEnded} onSeeking={this.handleVideoSeeking} onNoAudio={this.handleNoAudio} ref={(c) => { this.videoMediaComponent = c; }} controlsHidden={this.state.controlsHidden} />
             <div className="Player-text-chunks">
               {this.state.displayedSubs.map(({ subTrack, chunk }, subTrackIdx) => {
                 let hidden = false;
@@ -555,44 +726,48 @@ export default class Player extends Component {
                 }
 
                 return chunk ? (
-                  <div className="Player-text-chunk-outer" key={subTrack.id}>
-                    <div className="Player-text-chunk-inner">
-                      <div style={{position: 'relative'}}>
+                  <div className={'Player-text-chunk-outer Player-text-chunk-outer-' + (hidden ? 'hidden' : 'visible')} key={subTrack.id}>
+                    <span className="Player-text-chunk-inner">
+                      <span>
                         {hidden ? (
                           <div key={chunk.uid} className="Player-text-reveal-instructions">
                             <div style={{color: '#aaa'}}>(press &darr; to reveal)</div>
                           </div>
                         ) : null}
-                        <div className={'Player-text-chunk-annotext Player-text-chunk-annotext-' + (hidden ? 'hidden' : 'visible')}>
-                          <AnnoText key={chunk.uid} annoText={chunk.annoText} language={subTrack.language} showRuby={this.props.preferences.showRuby} searchDictionaries={this.props.searchDictionaries} ref={(subTrackIdx === 0) ? (c => { this.firstAnnoTextComponent = c; }) : null} />
-                        </div>
-                      </div>
-                    </div>
+                        <span className={'Player-text-chunk-annotext Player-text-chunk-annotext-' + (hidden ? 'hidden' : 'visible')}>
+                          <AnnoText key={chunk.uid} annoText={chunk.annoText} language={subTrack.language} showRuby={this.props.preferences.showRuby} searchDictionaries={this.props.searchDictionaries} getWordFromList={this.props.getWordFromList} setWordInList={this.props.setWordInList} ref={(subTrackIdx === 0) ? (c => { this.firstAnnoTextComponent = c; }) : null} />
+                        </span>
+                      </span>
+                    </span>
                   </div>
                 ) : null;
               })}
             </div>
           </div>
-          <PlayControls onBack={this.handleBack} onAhead={this.handleAhead} onReplay={this.handleReplay} onTogglePause={this.handleTogglePause} onContinue={this.handleContinue} onToggleRuby={this.handleToggleRuby} onToggleHelp={this.handleToggleHelp} onNumberKey={this.handleNumberKey} onExportCard={this.handleExportCard} onToggleFullscreen={this.handleToggleFullscreen} />
+          <PlayControls onBack={this.handleBack} onAhead={this.handleAhead} onReplay={this.handleReplay} onTogglePause={this.handleTogglePause} onContinue={this.handleContinue} onToggleRuby={this.handleToggleRuby} onMainSubTransient={this.handleMainSubTransient} onRubyTransient={this.handleRubyTransient} onToggleHelp={this.handleToggleHelp} onNumberKey={this.handleNumberKey} onExportCard={this.handleExportCard} onToggleFullscreen={this.handleToggleFullscreen} />
         </div>
-        <button className="Player-big-button Player-exit-button" onClick={this.handleExit}>↩</button>
-        <div className="Player-subtitle-controls-panel">
-          Subtitle Mode:&nbsp;
-          <Select options={Object.entries(MODE_TITLES).map(([k, v]) => ({value: k, label: v}))} onChange={this.handleSetSubtitleMode} value={this.state.subtitleMode} />&nbsp;&nbsp;
-          <button onClick={e => { e.preventDefault(); this.handleToggleHelp(); }}>Toggle Help</button>
-        </div>
+        {(
+          <button className={this.state.controlsHidden ? "Player-big-button Player-exit-button controls-hide" : "Player-big-button Player-exit-button"} onClick={this.handleExit}>↩</button>
+        )}
+        {(
+          <div className={this.state.controlsHidden ? "Player-subtitle-controls-panel controls-hide" : "Player-subtitle-controls-panel"}>
+            Subtitle Mode:&nbsp;&nbsp;
+            <Select options={Object.entries(MODE_TITLES).map(([k, v]) => ({value: k, label: v}))} onChange={this.handleSetSubtitleMode} value={this.state.subtitleMode} />&nbsp;&nbsp;
+            <button onClick={e => { e.preventDefault(); this.handleToggleHelp(); }}>Toggle Help</button>
+          </div>
+        )}
         <div className="Player-help-panel" style={{display: this.props.preferences.showHelp ? 'block' : 'none'}}>
           <div className="Player-help-panel-section">
             <div className="Player-help-panel-header">Keyboard Controls</div>
             <table><tbody>
-              <tr><td>Replay Sub:</td><td>&uarr;</td></tr>
-              <tr><td>Reveal Sub /<br/>Unpause:</td><td>&darr;</td></tr>
+              <tr><td>Replay Sub:</td><td>&darr;</td></tr>
+              <tr><td>Reveal Sub /<br/>Unpause:</td><td>&uarr;</td></tr>
               <tr><td>Previous Sub:</td><td>&larr;</td></tr>
               <tr><td>Next Sub:</td><td>&rarr;</td></tr>
               <tr><td>Pause/Unpause:</td><td>space</td></tr>
               <tr><td>Export To Anki:</td><td>E</td></tr>
               <tr><td>Toggle Fullscreen:</td><td>F</td></tr>
-              <tr><td>Toggle Furigana/Ruby:</td><td>R</td></tr>
+              <tr><td>Toggle Furigana/Ruby:</td><td>R / `</td></tr>
               <tr><td>Toggle Help:</td><td>H</td></tr>
               {(this.state.subtitleMode === 'manual') ? (
                 <tr><td>Hide/Show<br />Sub Track:</td><td>[1-9]</td></tr>

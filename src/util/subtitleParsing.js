@@ -3,9 +3,10 @@ import { WebVTTParser } from 'webvtt-parser';
 const cleanText = (s) => {
   const BREAK_RE = /(<br>)/ig; // sub files shouldn't have these, but some do
   const NL_RE = /(\\n|\\N)/ig;
+  const SPC_RE = / /g; // Replace ascii spaces.
   const TAG_RE = /(<([^>]+)>)/ig;
   const ASS_STYLE_RE = /(\{\\[^}]*\})/ig;
-  return s.trim().replace(BREAK_RE, '\n').replace(NL_RE, '\n').replace(TAG_RE, '').replace(ASS_STYLE_RE, '');
+  return s.trim().replace(BREAK_RE, '\n').replace(NL_RE, '\n').replace(TAG_RE, '').replace(ASS_STYLE_RE, '').replace(SPC_RE, "　");
 };
 
 const parseSRTTime = (s) => {

@@ -2,9 +2,25 @@
 .AnnoText {
   overflow: hidden;
   user-select: none;
+  font-size: 1.2em;
 }
 
 .AnnoText-textchar {
+}
+
+.AnnoText .word-state-0 {
+}
+
+.AnnoText .word-state-1 {
+  color: #99ee55;
+}
+
+.AnnoText .word-state-2 {
+  color: #bbbbee;
+}
+
+.AnnoText .word-state-3 {
+  color: #ff6666;
 }
 
 .AnnoText-textchar.AnnoText-selected {

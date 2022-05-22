@@ -4,6 +4,8 @@ import { ScrollContext } from 'react-router-scroll-4';
 
 import { extractAudioFromVideo, extractFrameImageFromVideo } from '../library';
 
+import { secondsToTimestamp } from '../util/string';
+
 import './App.css';
 
 import WidthWrapper from './WidthWrapper.js';
@@ -13,13 +15,31 @@ import AddCollection from './AddCollection.js';
 import ImportEpwing from './ImportEpwing.js';
 
 const VideoListItem = (props) => {
-  const { videoId, collection, name } = props;
+  const { videoId, collection, name, playbackPosition} = props;
   const hasSubs = collection.videos.get(videoId).subtitleTracks.size > 0;
+
+  // Get the current playback position.  We first check if we have a "live"
+  // version of the position, if the user has visited the video this session.
+  // Otherwise we get the position that was loaded from the database on
+  // application launch.
+  var position;
+  if (collection.videos.get(videoId).playbackPosition != null) {
+    position = collection.videos.get(videoId).playbackPosition;
+  } else {
+    position = playbackPosition;
+  }
+
+  // Build the timestamp for time watched.
+  var time_stamp = "";
+  if (position > 2.0) { // Only give a time stamp if enough has been watched.
+    time_stamp += "Watched ";
+    time_stamp += secondsToTimestamp(position);
+  }
 
   return (
     <li className={'App-library-list-item ' + (hasSubs ? 'App-library-list-item-has-subs' : 'App-library-list-item-no-subs')}>
       <Link to={'/player/' + encodeURIComponent(collection.locator) + '/' + encodeURIComponent(videoId)}>
-        {name}
+        {name} <span className="App-library-list-item-time-stamp">{time_stamp}</span>
       </Link>
     </li>
   );
@@ -39,7 +59,7 @@ class App extends Component {
             <Route path="/player/:cloc/:vid" render={({ match, history }) => {
               const collectionLocator = decodeURIComponent(match.params.cloc);
               const videoId = decodeURIComponent(match.params.vid);
-              return <Player video={mainState.collections.get(collectionLocator).videos.get(videoId)} onExit={() => { history.goBack(); }} onUpdatePlaybackPosition={(pos) => { actions.saveVideoPlaybackPosition(collectionLocator, videoId, pos); }} onNeedSubtitles={() => { actions.loadSubtitlesIfNeeded(collectionLocator, videoId); }} getSavedPlaybackPosition={() => { return actions.loadVideoPlaybackPosition(collectionLocator, videoId); }} onSetPreference={(pref, value) => { actions.setPreference(pref, value); }} preferences={mainState.preferences} sortFilterSubtitleTracksMap={actions.sortFilterSubtitleTracksMap} searchDictionaries={actions.searchDictionaries} onExtractAudio={(startTime, endTime) => extractAudioFromVideo(collectionLocator, videoId, startTime, endTime)} onExtractFrameImage={(time) => extractFrameImageFromVideo(collectionLocator, videoId, time)} ankiPrefs={mainState.preferences.anki} />;
+              return <Player video={mainState.collections.get(collectionLocator).videos.get(videoId)} onExit={() => { history.goBack(); }} onUpdatePlaybackPosition={(pos) => { actions.saveVideoPlaybackPosition(collectionLocator, videoId, pos); }} onNeedSubtitles={() => { actions.loadSubtitlesIfNeeded(collectionLocator, videoId); }} getSavedPlaybackPosition={() => { return actions.loadVideoPlaybackPosition(collectionLocator, videoId); }} onSetPreference={(pref, value) => { actions.setPreference(pref, value); }} preferences={mainState.preferences} sortFilterSubtitleTracksMap={actions.sortFilterSubtitleTracksMap} searchDictionaries={actions.searchDictionaries} getWordFromList = {actions.getWordFromList} setWordInList={actions.setWordInList} onExtractAudio={(startTime, endTime) => extractAudioFromVideo(collectionLocator, videoId, startTime, endTime)} onExtractFrameImage={(time) => extractFrameImageFromVideo(collectionLocator, videoId, time)} ankiPrefs={mainState.preferences.anki} />;
             }}/>
             <Route path="/add_collection" render={({ history }) => {
               return <AddCollection onAdd={(name, dir) => { actions.addLocalCollection(name, dir); history.replace('/library'); }} onExit={() => { history.goBack(); }} />;
@@ -68,21 +88,21 @@ class App extends Component {
                           {title.parts.seasonEpisodes.length ? (
                             <ul>
                               {title.parts.seasonEpisodes.map(se => (
-                                <VideoListItem collection={collection} videoId={se.videoId} name={'Season ' + se.seasonNumber + ' Episode ' + se.episodeNumber} key={se.videoId} />
+                                <VideoListItem collection={collection} videoId={se.videoId} name={'Season ' + se.seasonNumber + ' Episode ' + se.episodeNumber} playbackPosition={se.playbackPosition} key={se.videoId} />
                               ))}
                             </ul>
                           ) : null}
                           {title.parts.episodes.length ? (
                             <ul>
                               {title.parts.episodes.map(ep => (
-                                <VideoListItem collection={collection} videoId={ep.videoId} name={'Episode ' + ep.episodeNumber} key={ep.videoId} />
+                                <VideoListItem collection={collection} videoId={ep.videoId} name={'Episode ' + ep.episodeNumber} playbackPosition={ep.playbackPosition} key={ep.videoId} />
                               ))}
                             </ul>
                           ) : null}
                           {title.parts.others.length ? (
                             <ul>
                               {title.parts.others.map(other => (
-                                <VideoListItem collection={collection} videoId={other.videoId} name={other.name} key={other.name} />
+                                <VideoListItem collection={collection} videoId={other.videoId} name={other.name} playbackPosition={other.playbackPosition} key={other.name} />
                               ))}
                             </ul>
                           ) : null}
@@ -112,7 +132,7 @@ class App extends Component {
                                     </Link>
                                   </li>
                                 ) : (
-                                  <VideoListItem collection={collection} videoId={title.videoId} name={title.name} key={title.name} />
+                                  <VideoListItem collection={collection} videoId={title.videoId} name={title.name} playbackPosition={title.playbackPosition} key={title.name} />
                                 )
                               )}
                             </ul>

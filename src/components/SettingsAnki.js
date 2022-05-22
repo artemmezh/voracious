@@ -12,6 +12,8 @@ const VORACIOUS_FIELD_NAMES = new Map([
   ['audio', 'Audio'],
   ['image', 'Image'],
   ['selected_text', 'Selected Text'],
+  ['time_stamp', 'Timestamp (of subtitle)'],
+  ['title', 'Title (of video)'],
 ]);
 
 const FIELD_DEFAULTS = new Map([
