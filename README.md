@@ -124,3 +124,7 @@ You should change config.json in folder (~/Library/Application Support/Anki2) of
     "ignoreOriginList": []
 }
 ```
+
+## Can`t start application cause ' file too short'
+This is described in this issue https://github.com/rsimmons/voracious/issues/43
+Please, opening the zip file with The Unarchiver
