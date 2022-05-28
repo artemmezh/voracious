@@ -1,8 +1,9 @@
 import { List, Record, Map as IMap, OrderedMap, Set as ISet } from 'immutable';
 
 import createStorageBackend from './storage';
-import { getCollectionIndex, loadCollectionSubtitleTrack } from './library';
+import {getCollectionIndex, getBaseDirectoryToSubtitles, loadCollectionSubtitleTrack} from './library';
 import { loadDictionaries, searchIndex } from './dictionary';
+import path from "path";
 
 const fs = window.require('fs-extra'); // use window to avoid webpack
 const { process } = window.require('electron').remote;
@@ -277,6 +278,18 @@ export default class MainActions {
 
     this.state.set(this.state.get().setIn(['collections', collectionLocator, 'videos', videoId, 'loadingSubs'], false));
   };
+
+    getSubtitleInfo = (collectionLocator, videoId) => {
+        const subTracks = this.state.get().getIn(['collections', collectionLocator, 'videos', videoId, 'subtitleTracks']);
+        const subtitleInfo = new Map();
+        for (const subTrack of subTracks.values()) {
+            if (!subTrack.chunkSet && !subTrack.loading) {
+                subtitleInfo.set(subTrack.id, getBaseDirectoryToSubtitles(collectionLocator, subTrack.id))
+            }
+        }
+
+        return subtitleInfo;
+    };
 
   sortFilterSubtitleTracksMap = (subTracksMap) => {
     const prefOrder = this.state.get().preferences.subtitleOrder.toArray();

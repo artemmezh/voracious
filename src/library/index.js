@@ -240,6 +240,7 @@ const loadSubtitleTrackFromFile = async (filename) => {
   let subs;
   if (filename.endsWith('.srt')) {
     subs = parseSRT(data);
+
   } else if (filename.endsWith('.vtt')) {
     subs = parseVTT(data);
   } else if (filename.endsWith('.ass')) {
@@ -278,6 +279,14 @@ export const loadCollectionSubtitleTrack = async (collectionLocator, subTrackId)
   } else {
     throw new Error('internal error');
   }
+};
+
+export const getBaseDirectoryToSubtitles = (collectionLocator, subTrackId) => {
+    if (collectionLocator.startsWith(LOCAL_PREFIX)) {
+        return collectionLocator.slice(LOCAL_PREFIX.length);
+    } else {
+        throw new Error('internal error');
+    }
 };
 
 export const extractAudioFromVideo = async (collectionLocator, vidId, startTime, endTime) => {

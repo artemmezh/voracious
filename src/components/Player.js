@@ -7,6 +7,7 @@ import './Player.css';
 import Select from './Select.js';
 import AnnoText from './AnnoText.js';
 import PlayerExportPanel from './PlayerExportPanel';
+import ShiftSubtitlePanel from './ShiftSubtitlePanel';
 
 import { getChunkAtTime, getPrevChunkAtTime, getNextChunkAtTime } from '../util/chunk';
 
@@ -146,7 +147,7 @@ class PlayControls extends Component {
       return;
     }
 
-    const { onBack, onAhead, onReplay, onTogglePause, onContinue, onToggleRuby, onMainSubTransient, onRubyTransient, onToggleHelp, onNumberKey, onExportCard, onToggleFullscreen } = this.props;
+    const { onBack, onAhead, onReplay, onTogglePause, onContinue, onToggleRuby, onMainSubTransient, onRubyTransient, onToggleHelp, onNumberKey, onExportCard, onShiftSubtitle, onToggleFullscreen } = this.props;
 
     if (!e.repeat) {
       if ((e.keyCode >= 49) && (e.keyCode <= 57)) {
@@ -181,6 +182,11 @@ class PlayControls extends Component {
 
           case 69: // E key
             onExportCard();
+            e.preventDefault();
+            break;
+
+          case 83: // S key
+            onShiftSubtitle();
             e.preventDefault();
             break;
 
@@ -287,6 +293,8 @@ export default class Player extends Component {
       noAudio: false,
       controlsHidden: false,
       exporting: null,
+      shiftSubtitle: null,
+      subtitleInfo: props.subtitleInfo
     };
 
     this.videoTime = null;
@@ -681,11 +689,42 @@ export default class Player extends Component {
     });
   };
 
+  handleShiftSubtitle = () => {
+      console.log("hello from shift sub");
+      if (!this.state.displayedSubs.length) {
+          return;
+      }
+
+      const currentChunk = this.state.displayedSubs[0].chunk;
+      if (!currentChunk) {
+          return;
+      }
+
+      this.setState(state => {
+          const newState = {...state};
+          if (!state.shiftSubtitle) {
+              newState.shiftSubtitle = {
+                  chunk: currentChunk,
+                  videoTime: this.videoTime,
+                  selectedText: this.firstAnnoTextComponent ? this.firstAnnoTextComponent.getSelectedText() : null,
+                  title: this.props.video.name,
+              };
+          }
+          return newState;
+      });
+    };
+
   handleExportDone = () => {
     this.setState({
       exporting: null,
     });
   };
+
+    handleShiftingSubtitleDone = () => {
+        this.setState({
+            shiftSubtitle: null,
+        });
+    };
 
   handleToggleFullscreen = () => {
     const currentWindow = remote.getCurrentWindow();
@@ -744,7 +783,21 @@ export default class Player extends Component {
               })}
             </div>
           </div>
-          <PlayControls onBack={this.handleBack} onAhead={this.handleAhead} onReplay={this.handleReplay} onTogglePause={this.handleTogglePause} onContinue={this.handleContinue} onToggleRuby={this.handleToggleRuby} onMainSubTransient={this.handleMainSubTransient} onRubyTransient={this.handleRubyTransient} onToggleHelp={this.handleToggleHelp} onNumberKey={this.handleNumberKey} onExportCard={this.handleExportCard} onToggleFullscreen={this.handleToggleFullscreen} />
+              <PlayControls
+                  onBack={this.handleBack}
+                  onAhead={this.handleAhead}
+                  onReplay={this.handleReplay}
+                  onTogglePause={this.handleTogglePause}
+                  onContinue={this.handleContinue}
+                  onToggleRuby={this.handleToggleRuby}
+                  onMainSubTransient={this.handleMainSubTransient}
+                  onRubyTransient={this.handleRubyTransient}
+                  onToggleHelp={this.handleToggleHelp}
+                  onNumberKey={this.handleNumberKey}
+                  onExportCard={this.handleExportCard}
+                  onShiftSubtitle={this.handleShiftSubtitle}
+                  onToggleFullscreen={this.handleToggleFullscreen}
+              />
         </div>
         {(
           <button className={this.state.controlsHidden ? "Player-big-button Player-exit-button controls-hide" : "Player-big-button Player-exit-button"} onClick={this.handleExit}>↩</button>
@@ -772,6 +825,7 @@ export default class Player extends Component {
               {(this.state.subtitleMode === 'manual') ? (
                 <tr><td>Hide/Show<br />Sub Track:</td><td>[1-9]</td></tr>
               ) : null}
+              <tr><td>Shift subtitles:</td><td>S</td></tr>
             </tbody></table>
           </div>
           <div className="Player-help-panel-section">
@@ -816,6 +870,18 @@ export default class Player extends Component {
             <PlayerExportPanel ankiPrefs={this.props.ankiPrefs} onExtractAudio={this.props.onExtractAudio} onExtractFrameImage={this.props.onExtractFrameImage} onDone={this.handleExportDone} {...this.state.exporting} />
           </div>
         ) : null}
+      { this.state.shiftSubtitle? (
+          <div className="Player-export-panel">
+              <ShiftSubtitlePanel
+                  ankiPrefs={this.props.ankiPrefs}
+                  onExtractAudio={this.props.onExtractAudio}
+                  onExtractFrameImage={this.props.onExtractFrameImage}
+                  orderedSubtitleTracks={this.getOrderedSubtitleTracks()}
+                  subtitleInfo={this.state.subtitleInfo}
+                  onDone={this.handleShiftingSubtitleDone}
+                  {...this.state.shiftSubtitle} />
+          </div>
+      ) : null}
       </div>
     );
   }
